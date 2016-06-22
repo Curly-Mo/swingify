@@ -5,7 +5,7 @@ import librosa
 import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=44100):
+def swingify(file_path, outfile, factor, sr=44100, format=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
     anal_samples = librosa.resample(librosa.to_mono(y), sr, sr, res_type='kaiser_best')
     raw_samples = np.atleast_2d(y)
@@ -16,7 +16,7 @@ def swingify(file_path, outfile, factor, sr=44100):
     beats = get_beats(anal_samples, sr, 512)
 
     output = synthesize(raw_samples, beats, factor)
-    sf.write(outfile, output.T, int(sr))
+    sf.write(outfile, output.T, int(sr), format=format)
     return beats
 
 
