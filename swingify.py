@@ -40,7 +40,7 @@ def synthesize(raw_samples, beats, factor):
         frame = raw_samples[:, start:end]
 
         # timestretch the eigth notes
-        mid = math.floor((frame.shape[1])/2)
+        mid = int(math.floor((frame.shape[1])/2))
         #transition = math.floor((frame.shape[1]/10) / 2.) * 2
         #left = frame[:, :mid-transition//2]
         #trans = frame[:, mid-transition//2:mid+transition//2]
