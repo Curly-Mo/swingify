@@ -2,21 +2,24 @@ import math
 
 import numpy as np
 import librosa
-import soundfile as sf
+# import soundfile as sf
 
 
 def swingify(file_path, outfile, factor, sr=44100, format=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
-    anal_samples = librosa.resample(librosa.to_mono(y), sr, sr, res_type='kaiser_best')
+    anal_samples = librosa.to_mono(y)
     raw_samples = np.atleast_2d(y)
     # force stereo
     if raw_samples.shape[0] < 2:
+        print('doubling mono signal to be stereo')
         raw_samples = np.vstack([raw_samples, raw_samples])
 
     beats = get_beats(anal_samples, sr, 512)
 
     output = synthesize(raw_samples, beats, factor)
-    sf.write(outfile, output.T, int(sr), format=format)
+
+    # sf.write(outfile, output.T, int(sr), format=format)
+    librosa.output.write_wav(outfile, output, sr, norm=True)
     return beats
 
 
@@ -41,18 +44,19 @@ def synthesize(raw_samples, beats, factor):
 
         # timestretch the eigth notes
         mid = int(math.floor((frame.shape[1])/2))
-        #transition = math.floor((frame.shape[1]/10) / 2.) * 2
-        #left = frame[:, :mid-transition//2]
-        #trans = frame[:, mid-transition//2:mid+transition//2]
-        #right = frame[:, mid+transition+1:]
-        #left = timestretch(left, 1/factor)
-        #trans = timestretch(trans, (1/factor + factor)/2)
-        #right = timestretch(right, factor)
-        #frame = np.hstack([left, trans, right])
+        winsize = 256
+        window = np.bartlett(winsize*2)
         left = frame[:, :mid]
-        right = frame[:, mid+1:]
+        right = frame[:, mid:]
         left = timestretch(left, 1-2*val)
         right = timestretch(right, 1+5*val)
+
+        # taper the ends to 0 to avoid discontinuities
+        left[:, -winsize:] = np.vstack([left[0, -winsize:] * window[winsize:], left[1, -winsize:] * window[winsize:]])
+        right[:, :winsize] = np.vstack([right[0, :winsize] * window[:winsize], right[1, :winsize] * window[:winsize]])
+        right[:, -winsize:] = np.vstack([right[0, -winsize:] * window[winsize:], right[1, -winsize:] * window[winsize:]])
+        left[:, :winsize] = np.vstack([left[0, :winsize] * window[:winsize], left[1, :winsize] * window[:winsize]])
+
         frame = np.hstack([left, right])
 
         output[:, offset:(offset+frame.shape[1])] = frame
