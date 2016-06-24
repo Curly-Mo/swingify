@@ -5,7 +5,7 @@ import librosa
 # import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=44100, format=None):
+def swingify(file_path, outfile, factor, sr=44100):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
     anal_samples = librosa.to_mono(y)
     raw_samples = np.atleast_2d(y)
