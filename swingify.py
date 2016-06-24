@@ -2,11 +2,12 @@ import math
 
 import numpy as np
 import librosa
-# import soundfile as sf
+import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=44100):
+def swingify(file_path, outfile, factor, sr=44100, format=format):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
+    print(y.shape)
     anal_samples = librosa.to_mono(y)
     raw_samples = np.atleast_2d(y)
     # force stereo
@@ -18,8 +19,8 @@ def swingify(file_path, outfile, factor, sr=44100):
 
     output = synthesize(raw_samples, beats, factor)
 
-    # sf.write(outfile, output.T, int(sr), format=format)
-    librosa.output.write_wav(outfile, output, sr, norm=True)
+    sf.write(outfile, output.T, int(sr), format=format)
+    # librosa.output.write_wav(outfile, output, sr, norm=True)
     return beats
 
 
@@ -34,7 +35,7 @@ def get_beats(samples, sr=44100, hop_length=512):
 
 
 def synthesize(raw_samples, beats, factor):
-    array_shape = (2, raw_samples.shape[1]*4)
+    array_shape = (2, raw_samples.shape[1]*2)
     output = np.ndarray(array_shape)
     offset = 0
     val = (factor - 1) / (5*factor + 2)
@@ -44,7 +45,7 @@ def synthesize(raw_samples, beats, factor):
 
         # timestretch the eigth notes
         mid = int(math.floor((frame.shape[1])/2))
-        winsize = 256
+        winsize = 128
         window = np.bartlett(winsize*2)
         left = frame[:, :mid]
         right = frame[:, mid:]
