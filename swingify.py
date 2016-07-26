@@ -5,7 +5,7 @@ import librosa
 import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=44100, format=format):
+def swingify(file_path, outfile, factor, sr=44100, format=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
     print(y.shape)
     anal_samples = librosa.to_mono(y)
@@ -36,32 +36,53 @@ def get_beats(samples, sr=44100, hop_length=512):
 
 def synthesize(raw_samples, beats, factor):
     array_shape = (2, raw_samples.shape[1]*2)
-    output = np.ndarray(array_shape)
+    output = np.zeros(array_shape)
     offset = 0
     val = (factor - 1) / (5*factor + 2)
+    factor1 = 1-2*val
+    factor2 = 1+5*val
+
+    winsize = 64
+    winsize1 = math.floor(winsize / factor1)
+    winsize2 = math.floor(winsize / factor2)
+    winfront = np.hanning(winsize1*2)+1
+    winback = np.hanning(winsize2*2)+1
 
     for start, end in beats:
         frame = raw_samples[:, start:end]
 
         # timestretch the eigth notes
         mid = int(math.floor((frame.shape[1])/2))
-        winsize = 128
-        window = np.bartlett(winsize*2)
-        left = frame[:, :mid]
-        right = frame[:, mid:]
-        left = timestretch(left, 1-2*val)
-        right = timestretch(right, 1+5*val)
+        left = frame[:, :mid + winsize]
+        right = frame[:, mid - winsize:]
+        left = timestretch(left, factor1)
+        right = timestretch(right, factor2)
 
         # taper the ends to 0 to avoid discontinuities
-        left[:, -winsize:] = np.vstack([left[0, -winsize:] * window[winsize:], left[1, -winsize:] * window[winsize:]])
-        right[:, :winsize] = np.vstack([right[0, :winsize] * window[:winsize], right[1, :winsize] * window[:winsize]])
-        right[:, -winsize:] = np.vstack([right[0, -winsize:] * window[winsize:], right[1, -winsize:] * window[winsize:]])
-        left[:, :winsize] = np.vstack([left[0, :winsize] * window[:winsize], left[1, :winsize] * window[:winsize]])
+        left[:, -winsize1:] = left[:, -winsize1:] * winfront[winsize1:]
+        right[:, :winsize2] = right[:, :winsize2] * winback[:winsize2]
+        right[:, -winsize2:] = right[:, -winsize2:] * winback[winsize2:]
+        left[:, :winsize1] = left[:, :winsize1] * winfront[:winsize1]
 
-        frame = np.hstack([left, right])
+        # zero pad and add for the overlap
+        right = np.pad(
+            right,
+            pad_width=((0,0), (left.shape[1] - winsize1, 0)),
+            mode='constant',
+            constant_values=0
+        )
+        frame = sum_signals([left, right])
 
-        output[:, offset:(offset+frame.shape[1])] = frame
-        offset += frame.shape[1]
+        # zero pad and add to output for overlap
+        padded_frame = np.pad(
+            frame,
+            pad_width=((0,0), (max(0, offset - winsize1), 0)),
+            mode='constant',
+            constant_values=0
+        )
+        output = sum_signals([output, padded_frame])
+
+        offset += frame.shape[1] - winsize1
 
     output = output[:, 0:offset]
     return output
@@ -71,6 +92,22 @@ def timestretch(signal, factor):
     left = librosa.effects.time_stretch(signal[0, :], factor)
     right = librosa.effects.time_stretch(signal[1, :], factor)
     return np.vstack([left, right])
+
+
+def sum_signals(signals):
+    """
+    Sum together a list of stereo signals
+    append zeros to match the longest array
+    """
+    if not signals:
+        return np.array([])
+    max_length = max(sig.shape[1] for sig in signals)
+    y = np.zeros([2, max_length])
+    for sig in signals:
+        padded = np.zeros([2, max_length])
+        padded[:, 0:sig.shape[1]] = sig
+        y += padded
+    return y
 
 
 def ola(samples, win_length, hop_length, factor):
