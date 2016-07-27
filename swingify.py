@@ -19,6 +19,7 @@ def swingify(file_path, outfile, factor, sr=44100, format=None):
 
     output = synthesize(raw_samples, beats, factor)
 
+    output = output * 0.7
     sf.write(outfile, output.T, int(sr), format=format)
     # librosa.output.write_wav(outfile, output, sr, norm=True)
     return beats
@@ -42,47 +43,42 @@ def synthesize(raw_samples, beats, factor):
     factor1 = 1-2*val
     factor2 = 1+5*val
 
-    winsize = 64
-    winsize1 = math.floor(winsize / factor1)
-    winsize2 = math.floor(winsize / factor2)
-    winfront = np.hanning(winsize1*2)+1
-    winback = np.hanning(winsize2*2)+1
+    winsize = 512
+    window = np.hanning(winsize*2-1)
+    winsize1 = math.floor(winsize * factor1)
+    winsize2 = math.floor(winsize * factor2)
 
     for start, end in beats:
         frame = raw_samples[:, start:end]
 
         # timestretch the eigth notes
         mid = int(math.floor((frame.shape[1])/2))
-        left = frame[:, :mid + winsize]
-        right = frame[:, mid - winsize:]
+        left = frame[:, :mid + winsize1]
+        right = frame[:, max(0, mid - winsize2):]
         left = timestretch(left, factor1)
         right = timestretch(right, factor2)
 
         # taper the ends to 0 to avoid discontinuities
-        left[:, -winsize1:] = left[:, -winsize1:] * winfront[winsize1:]
-        right[:, :winsize2] = right[:, :winsize2] * winback[:winsize2]
-        right[:, -winsize2:] = right[:, -winsize2:] * winback[winsize2:]
-        left[:, :winsize1] = left[:, :winsize1] * winfront[:winsize1]
+        left[:, :winsize] = left[:, :winsize] * window[:winsize]
+        left[:, -winsize:] = left[:, -winsize:] * window[-winsize:]
+        right[:, :winsize] = right[:, :winsize] * window[:winsize]
+        right[:, -winsize:] = right[:, -winsize:] * window[-winsize:]
 
         # zero pad and add for the overlap
         right = np.pad(
             right,
-            pad_width=((0,0), (left.shape[1] - winsize1, 0)),
+            pad_width=((0, 0), (left.shape[1] - winsize, 0)),
             mode='constant',
             constant_values=0
         )
         frame = sum_signals([left, right])
 
-        # zero pad and add to output for overlap
-        padded_frame = np.pad(
-            frame,
-            pad_width=((0,0), (max(0, offset - winsize1), 0)),
-            mode='constant',
-            constant_values=0
-        )
-        output = sum_signals([output, padded_frame])
+        if offset > 0:
+            overlap = sum_signals([output[:, offset-winsize1:offset], frame[:, :winsize1]])
+            output[:, max(0, offset - winsize1):offset] = overlap
+        output[:, offset:(offset+frame.shape[1]-winsize1)] = frame[:, winsize1:]
 
-        offset += frame.shape[1] - winsize1
+        offset += frame.shape[1] - winsize
 
     output = output[:, 0:offset]
     return output
