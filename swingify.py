@@ -5,7 +5,7 @@ import librosa
 import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=44100, format=None):
+def swingify(file_path, outfile, factor, sr=None, format=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
     print(y.shape)
     anal_samples = librosa.to_mono(y)
@@ -20,7 +20,8 @@ def swingify(file_path, outfile, factor, sr=44100, format=None):
     output = synthesize(raw_samples, beats, factor)
 
     output = output * 0.7
-    sf.write(outfile, output.T, int(sr), format=format)
+    print(sr)
+    sf.write(outfile, output.T, int(sr), format=format, subtype='PCM_32')
     # librosa.output.write_wav(outfile, output, sr, norm=True)
     return beats
 
@@ -44,9 +45,9 @@ def synthesize(raw_samples, beats, factor):
     factor2 = 1+5*val
 
     winsize = 512
-    window = np.hanning(winsize*2-1)
-    winsize1 = math.floor(winsize * factor1)
-    winsize2 = math.floor(winsize * factor2)
+    window = np.bartlett(winsize*2-1)
+    winsize1 = int(math.floor(winsize * factor1))
+    winsize2 = int(math.floor(winsize * factor2))
 
     for start, end in beats:
         frame = raw_samples[:, start:end]
@@ -65,18 +66,13 @@ def synthesize(raw_samples, beats, factor):
         right[:, -winsize:] = right[:, -winsize:] * window[-winsize:]
 
         # zero pad and add for the overlap
-        right = np.pad(
-            right,
-            pad_width=((0, 0), (left.shape[1] - winsize, 0)),
-            mode='constant',
-            constant_values=0
-        )
-        frame = sum_signals([left, right])
+        overlap = sum_signals([left[:, -winsize:], right[:, :winsize]])
+        frame = np.hstack([left[:, :-winsize], overlap, right[:, winsize:]])
 
         if offset > 0:
-            overlap = sum_signals([output[:, offset-winsize1:offset], frame[:, :winsize1]])
-            output[:, max(0, offset - winsize1):offset] = overlap
-        output[:, offset:(offset+frame.shape[1]-winsize1)] = frame[:, winsize1:]
+            overlap = sum_signals([output[:, offset-winsize:offset], frame[:, :winsize]])
+            output[:, max(0, offset - winsize):offset] = overlap
+        output[:, offset:(offset+frame.shape[1]-winsize)] = frame[:, winsize:]
 
         offset += frame.shape[1] - winsize
 
