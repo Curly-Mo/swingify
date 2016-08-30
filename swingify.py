@@ -21,7 +21,7 @@ def swingify(file_path, outfile, factor, sr=None, format=None):
 
     output = output * 0.7
     print(sr)
-    sf.write(outfile, output.T, int(sr), format=format, subtype='PCM_32')
+    sf.write(outfile, output.T, int(sr), format=format)
     # librosa.output.write_wav(outfile, output, sr, norm=True)
     return beats
 
