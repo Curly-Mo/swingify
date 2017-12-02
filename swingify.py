@@ -11,7 +11,7 @@ def swingify(file_path, outfile, factor, sr=None, format=None, max_length=None):
     print(y.shape)
     if max_length:
         print('trimming audio to max_len: {} seconds'.format(max_length))
-        if len(y.shape > 1):
+        if len(y.shape) > 1:
             y = y[:, :max_length*sr]
         else:
             y = y[:max_length*sr]
