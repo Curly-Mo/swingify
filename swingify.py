@@ -1,12 +1,16 @@
 import math
+import argparse
 
 import numpy as np
 import librosa
 import soundfile as sf
 
 
-def swingify(file_path, outfile, factor, sr=None, format=None):
+def swingify(file_path, outfile, factor, sr=None, format=None, max_length=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
+    print(y.shape)
+    if max_length:
+        y = y[:, :max_length*sr]
     print(y.shape)
     anal_samples = librosa.to_mono(y)
     raw_samples = np.atleast_2d(y)
@@ -123,3 +127,17 @@ def ola(samples, win_length, hop_length, factor):
         result[i2:i2+win_length] += hanning_window*a2
 
     return result
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Make a song swing")
+    parser.add_argument('audio_path', type=str, help='Input audio file path')
+    parser.add_argument('output', type=str, help='Output file path')
+    parser.add_argument('-f', '--factor', type=float, default=2.0,
+            help='Swing factor {light: 1.5, medium: 2.0, hard: 3.0}')
+    parser.add_argument('--format', type=str, default='wav',
+                        help='Output audio format')
+    args = parser.parse_args()
+
+    swingify(args.audio_path, args.output, args.factor, format=args.format)
