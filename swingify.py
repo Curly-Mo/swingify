@@ -10,8 +10,12 @@ def swingify(file_path, outfile, factor, sr=None, format=None, max_length=None):
     y, sr = librosa.load(file_path, mono=False, sr=sr)
     print(y.shape)
     if max_length:
-        y = y[:, :max_length*sr]
-    print(y.shape)
+        print('trimming audio to max_len: {} seconds'.format(max_length))
+        if len(y.shape > 1):
+            y = y[:, :max_length*sr]
+        else:
+            y = y[:max_length*sr]
+        print(y.shape)
     anal_samples = librosa.to_mono(y)
     raw_samples = np.atleast_2d(y)
     # force stereo
