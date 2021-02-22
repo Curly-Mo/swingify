@@ -45,7 +45,7 @@ def synthesize(raw_samples, beats, factor):
     factor1 = 1-2*val
     factor2 = 1+5*val
 
-    winsize = 256
+    winsize = 128
     window = np.hanning(winsize*2-1)
     winsize1 = int(math.floor(winsize * factor1))
     winsize2 = int(math.floor(winsize * factor2))
