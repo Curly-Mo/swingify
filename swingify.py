@@ -45,7 +45,7 @@ def synthesize(raw_samples, beats, factor):
     factor1 = 1-2*val
     factor2 = 1+5*val
 
-    winsize = 512
+    winsize = 64
     window = np.bartlett(winsize*2-1)
     winsize1 = int(math.floor(winsize * factor1))
     winsize2 = int(math.floor(winsize * factor2))
@@ -79,6 +79,45 @@ def synthesize(raw_samples, beats, factor):
 
     output = output[:, 0:offset]
     return output
+
+
+def synthesize_no_crossfade(raw_samples, beats, factor):
+    array_shape = (2, raw_samples.shape[1]*2)
+    output = np.zeros(array_shape)
+    offset = 0
+    val = (factor - 1) / (5*factor + 2)
+    factor1 = 1-2*val
+    factor2 = 1+5*val
+
+    for start, end in beats:
+        # take one extra sample at end of frame
+        frame = raw_samples[:, start:end + 1]
+
+        # timestretch the eigth notes
+        mid = int(math.floor((frame.shape[1]-1)/2))
+        # take one extra sample at end of left frame
+        left = frame[:, :mid + 1]
+        right = frame[:, mid:]
+        print(left)
+        print(right)
+        print(left.shape)
+        print(right.shape)
+        left = timestretch(left, factor1)
+        right = timestretch(right, factor2)
+        print(left)
+        print(right)
+
+        # trim extra samples before joining back together
+        frame = np.hstack([left[:, :-1], right[: :-1]])
+
+        output[:, offset:(offset+frame.shape[1])] = frame
+
+        offset += frame.shape[1]
+
+    output = output[:, 0:offset]
+    return output
+
+
 
 
 def timestretch(signal, factor):
